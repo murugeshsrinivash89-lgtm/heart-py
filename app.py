@@ -1,9 +1,8 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
 
 # Page config
-st.set_page_config(page_title="VYNTARA", page_icon="❤️", layout="centered")
+st.set_page_config(page_title="VYNTARA")
 
 # UI CSS
 st.markdown("""
@@ -32,47 +31,29 @@ body {
 """, unsafe_allow_html=True)
 
 # Title
-st.markdown('<div class="big-title">❤️ VYNTARA Heart Analyzer</div>', unsafe_allow_html=True)
-st.write("")
+st.markdown('<div class="big-title">VYNTARA Heart Monitor</div>', unsafe_allow_html=True)
 
-# Input card
-with st.container():
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+# Input
+hr = st.slider("Heart Rate (BPM)", 50, 150, 80)
+rmssd = st.slider("RMSSD", 0.01, 0.1, 0.05)
+sdnn = st.slider("SDNN", 0.01, 0.1, 0.05)
 
-    hr = st.number_input("💓 Heart Rate (BPM)", min_value=0.0)
-    rmssd = st.number_input("📊 RMSSD", min_value=0.0)
-    sdnn = st.number_input("📉 SDNN", min_value=0.0)
+# Result logic
+if hr > 110:
+    state = "HIGH HR"
+    color = "red"
+elif rmssd < 0.04 and sdnn < 0.05:
+    state = "STRESS"
+    color = "orange"
+else:
+    state = "NORMAL"
+    color = "green"
 
-    st.write("")
+st.markdown(f'<div class="result" style="color:{color}">{state}</div>', unsafe_allow_html=True)
 
-    if st.button("🚀 Analyze"):
+# GRAPH (Streamlit built-in)
+t = np.linspace(0, 5, 200)
+signal = 0.6 * np.sin(2 * np.pi * (hr/60) * t)
+signal += 0.05 * np.random.randn(len(t))
 
-        # RESULT LOGIC
-        if hr > 110:
-            state = "HIGH HR"
-            color = "red"
-        elif rmssd < 0.04 and sdnn < 0.05:
-            state = "STRESS"
-            color = "orange"
-        else:
-            state = "NORMAL"
-            color = "green"
-
-        st.markdown(f'<div class="result" style="color:{color};">⚡ {state}</div>', unsafe_allow_html=True)
-
-        # GRAPH (heartbeat simulation)
-        t = np.linspace(0, 5, 500)
-        signal = 0.6 * np.sin(2 * np.pi * (hr/60) * t)
-
-        # small noise
-        signal += 0.05 * np.random.randn(len(t))
-
-        fig, ax = plt.subplots()
-        ax.plot(t, signal)
-        ax.set_title("Simulated Heart Signal")
-        ax.set_xlabel("Time (s)")
-        ax.set_ylabel("Amplitude")
-
-        st.pyplot(fig)
-
-    st.markdown('</div>', unsafe_allow_html=True)
+st.line_chart(signal)
