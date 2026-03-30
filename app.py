@@ -29,7 +29,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------- TITLE ----------------
-st.markdown('<div class="big-title">VYNTARA AI Health Dashboard</div>', unsafe_allow_html=True)
+st.markdown('<div class="big-title"> AI Health Dashboard</div>', unsafe_allow_html=True)
 
 # ---------------- TABS ----------------
 tab1, tab2 = st.tabs(["💓 Monitor", "🧠 Stress Quiz"])
