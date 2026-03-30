@@ -31,7 +31,7 @@ body {
 """, unsafe_allow_html=True)
 
 # Title
-st.markdown('<div class="big-title">VYNTARA Heart Monitor</div>', unsafe_allow_html=True)
+st.markdown('<div class="big-title">Heart Monitor</div>', unsafe_allow_html=True)
 
 # Input
 hr = st.slider("Heart Rate (BPM)", 50, 150, 80)
