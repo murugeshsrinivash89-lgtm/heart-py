@@ -25,7 +25,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------- TITLE ----------------
-st.markdown('<div class="big-title">VYNTARA AI Health Dashboard</div>', unsafe_allow_html=True)
+st.markdown('<div class="big-title"> AI Health Dashboard</div>', unsafe_allow_html=True)
 
 # ---------------- THEORY SECTION ----------------
 st.markdown("## 📘 AIM")
