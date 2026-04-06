@@ -1,3 +1,4 @@
+import streamlit as st
 import numpy as np
 import pandas as pd
 import cv2
@@ -6,77 +7,33 @@ import joblib
 from sklearn.ensemble import RandomForestClassifier
 
 # =========================
-# SIGNAL PROCESSING
+# STYLE
 # =========================
-def extract_ppg_features(ppg_signal):
-    features = {}
-
-    features['mean'] = np.mean(ppg_signal)
-    features['std'] = np.std(ppg_signal)
-    features['max'] = np.max(ppg_signal)
-    features['min'] = np.min(ppg_signal)
-
-    # Simple peak detection
-    peaks = np.where(ppg_signal > np.mean(ppg_signal))[0]
-    features['peak_count'] = len(peaks)
-
-    return features
-
-
-def extract_temp_features(temp_signal):
-    return {
-        'temp_mean': np.mean(temp_signal),
-        'temp_std': np.std(temp_signal)
-    }
-
+st.markdown("""
+<style>
+.big-title {font-size:30px; font-weight:bold;}
+.result {font-size:24px; font-weight:bold;}
+.card {padding:20px; border-radius:10px; background:#111;}
+</style>
+""", unsafe_allow_html=True)
 
 # =========================
-# IMAGE PROCESSING
-# =========================
-def extract_image_features(image_path):
-    img = cv2.imread(image_path)
-
-    if img is None:
-        raise ValueError("❌ Image not found. Check path!")
-
-    img = cv2.resize(img, (100, 100))
-
-    mean_colors = img.mean(axis=(0, 1))
-
-    return {
-        'blue_mean': mean_colors[0],
-        'green_mean': mean_colors[1],
-        'red_mean': mean_colors[2]
-    }
-
-
-# =========================
-# MODEL TRAINING
+# MODEL
 # =========================
 def train_model():
-    print("⚙️ Training model...")
-
-    np.random.seed(42)
     data = []
-
     for _ in range(300):
         sample = {
-            'mean': np.random.rand(),
-            'std': np.random.rand(),
-            'max': np.random.rand(),
-            'min': np.random.rand(),
-            'peak_count': np.random.randint(50, 150),
-            'temp_mean': np.random.uniform(30, 37),
-            'temp_std': np.random.rand(),
-            'red_mean': np.random.rand() * 255,
-            'green_mean': np.random.rand() * 255,
-            'blue_mean': np.random.rand() * 255,
-            'label': np.random.randint(0, 2)
+            'brightness': np.random.rand()*255,
+            'contrast': np.random.rand(),
+            'red_mean': np.random.rand()*255,
+            'green_mean': np.random.rand()*255,
+            'blue_mean': np.random.rand()*255,
+            'label': np.random.randint(0,2)
         }
         data.append(sample)
 
     df = pd.DataFrame(data)
-
     X = df.drop('label', axis=1)
     y = df['label']
 
@@ -84,54 +41,102 @@ def train_model():
     model.fit(X, y)
 
     os.makedirs("models", exist_ok=True)
-    joblib.dump(model, "models/model.pkl")
+    joblib.dump(model, "models/skin_model.pkl")
 
-    print("✅ Model trained & saved!")
-
-
-# =========================
-# PREDICTION
-# =========================
-def predict(image_path):
-    if not os.path.exists("models/model.pkl"):
+def load_model():
+    if not os.path.exists("models/skin_model.pkl"):
         train_model()
+    return joblib.load("models/skin_model.pkl")
 
-    model = joblib.load("models/model.pkl")
+# =========================
+# FEATURE EXTRACTION
+# =========================
+def extract_features(image):
+    img = cv2.resize(image,(100,100))
 
-    # Simulated signals (replace with real sensors later)
-    ppg_signal = np.random.rand(100)
-    temp_signal = np.random.uniform(30, 37, 50)
+    brightness = np.mean(img)
+    contrast = np.std(img)
 
-    ppg_features = extract_ppg_features(ppg_signal)
-    temp_features = extract_temp_features(temp_signal)
-    image_features = extract_image_features(image_path)
+    mean = img.mean(axis=(0,1))
 
-    # Combine all features
-    features = {**ppg_features, **temp_features, **image_features}
+    return {
+        'brightness': brightness,
+        'contrast': contrast,
+        'blue_mean': mean[0],
+        'green_mean': mean[1],
+        'red_mean': mean[2]
+    }
 
-    X = np.array(list(features.values())).reshape(1, -1)
+# =========================
+# TITLE
+# =========================
+st.markdown('<div class="big-title">AI Skin Health Dashboard</div>', unsafe_allow_html=True)
 
-    prediction = model.predict(X)[0]
-    probability = model.predict_proba(X)[0][1]
+tab1, tab2 = st.tabs(["📸 Analyzer","📊 Report"])
 
-    print("\n===== RESULT =====")
-    print(f"Risk Probability: {probability:.2f}")
+# =========================
+# TAB 1
+# =========================
+with tab1:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    if prediction == 1:
-        print("⚠️ Risk of circulatory issue detected")
+    uploaded = st.file_uploader("Upload Skin Image", type=["jpg","png"])
+
+    if uploaded:
+        file_bytes = np.asarray(bytearray(uploaded.read()),dtype=np.uint8)
+        image = cv2.imdecode(file_bytes,1)
+
+        st.image(image, use_column_width=True)
+
+        if st.button("Analyze"):
+            model = load_model()
+
+            features = extract_features(image)
+            X = np.array(list(features.values())).reshape(1,-1)
+
+            pred = model.predict(X)[0]
+            prob = model.predict_proba(X)[0][1]
+
+            st.subheader("Result")
+            st.write(f"Probability: {prob:.2f}")
+
+            if pred==1:
+                st.error("⚠️ Acne / Skin Issue Detected")
+            else:
+                st.success("✅ Healthy Skin")
+
+            st.session_state['result'] = pred
+            st.session_state['prob'] = prob
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# =========================
+# TAB 2
+# =========================
+with tab2:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    if 'result' in st.session_state:
+        result = st.session_state['result']
+        prob = st.session_state['prob']
+
+        if result==1:
+            state="Skin Issue"
+            color="red"
+        else:
+            state="Healthy"
+            color="green"
+
+        st.markdown(f'<div class="result" style="color:{color}">{state}</div>', unsafe_allow_html=True)
+
+        df = pd.DataFrame({
+            "Condition":[state],
+            "Probability":[prob]
+        })
+
+        st.table(df)
+
     else:
-        print("✅ Normal circulation")
+        st.write("Run analysis first...")
 
-
-# =========================
-# MAIN
-# =========================
-if __name__ == "__main__":
-    print("🔍 Fingertip Circulation Predictor")
-
-    image_path = input("Enter fingertip image path: ")
-
-    try:
-        predict(image_path)
-    except Exception as e:
-        print(e)
+    st.markdown('</div>', unsafe_allow_html=True)
