@@ -1,156 +1,137 @@
-import streamlit as st
 import numpy as np
 import pandas as pd
+import cv2
+import os
+import joblib
+from sklearn.ensemble import RandomForestClassifier
 
-# ---------------- STYLE ----------------
-st.markdown("""
-<style>
-.big-title {
-    font-size: 32px;
-    font-weight: bold;
-    text-align: center;
-    color: #00FFFF;
-}
-.card {
-    background-color: #111;
-    padding: 20px;
-    border-radius: 15px;
-}
-.result {
-    font-size: 24px;
-    font-weight: bold;
-    text-align: center;
-}
-</style>
-""", unsafe_allow_html=True)
+# =========================
+# SIGNAL PROCESSING
+# =========================
+def extract_ppg_features(ppg_signal):
+    features = {}
 
-# ---------------- TITLE ----------------
-st.markdown('<div class="big-title"> AI Health Dashboard</div>', unsafe_allow_html=True)
+    features['mean'] = np.mean(ppg_signal)
+    features['std'] = np.std(ppg_signal)
+    features['max'] = np.max(ppg_signal)
+    features['min'] = np.min(ppg_signal)
 
-# ---------------- THEORY SECTION ----------------
-st.markdown("## 📘 AIM")
-st.write("To monitor heart rate and stress levels using HRV parameters (RMSSD, SDNN) and provide real-time analysis.")
+    # Simple peak detection
+    peaks = np.where(ppg_signal > np.mean(ppg_signal))[0]
+    features['peak_count'] = len(peaks)
 
-st.markdown("## ⚙️ PRINCIPLE")
-st.write("""
-- HRV (Heart Rate Variability) is used to assess stress.
-- RMSSD → short-term variability  
-- SDNN → overall variability  
-- Low HRV = High Stress  
-- High HRV = Relaxed state  
-""")
+    return features
 
-st.markdown("## 🧪 PROCEDURE")
-st.write("""
-1. Collect heart rate data  
-2. Calculate RMSSD and SDNN  
-3. Apply threshold-based logic  
-4. Classify state (Normal / Stress / High HR)  
-5. Display results and graph  
-""")
 
-# ---------------- TABS ----------------
-tab1, tab2 = st.tabs(["💓 Monitor", "🧠 Stress Quiz"])
+def extract_temp_features(temp_signal):
+    return {
+        'temp_mean': np.mean(temp_signal),
+        'temp_std': np.std(temp_signal)
+    }
 
-# ================= MONITOR =================
-with tab1:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns(3)
+# =========================
+# IMAGE PROCESSING
+# =========================
+def extract_image_features(image_path):
+    img = cv2.imread(image_path)
 
-    with col1:
-        hr = st.slider("Heart Rate", 50, 150, 80)
+    if img is None:
+        raise ValueError("❌ Image not found. Check path!")
 
-    with col2:
-        rmssd = st.slider("RMSSD", 0.01, 0.1, 0.05)
+    img = cv2.resize(img, (100, 100))
 
-    with col3:
-        sdnn = st.slider("SDNN", 0.01, 0.1, 0.05)
+    mean_colors = img.mean(axis=(0, 1))
 
-    # -------- LOGIC --------
-    if hr > 110:
-        state = "HIGH HR"
-        color = "red"
-    elif rmssd < 0.04 and sdnn < 0.05:
-        state = "STRESS"
-        color = "orange"
+    return {
+        'blue_mean': mean_colors[0],
+        'green_mean': mean_colors[1],
+        'red_mean': mean_colors[2]
+    }
+
+
+# =========================
+# MODEL TRAINING
+# =========================
+def train_model():
+    print("⚙️ Training model...")
+
+    np.random.seed(42)
+    data = []
+
+    for _ in range(300):
+        sample = {
+            'mean': np.random.rand(),
+            'std': np.random.rand(),
+            'max': np.random.rand(),
+            'min': np.random.rand(),
+            'peak_count': np.random.randint(50, 150),
+            'temp_mean': np.random.uniform(30, 37),
+            'temp_std': np.random.rand(),
+            'red_mean': np.random.rand() * 255,
+            'green_mean': np.random.rand() * 255,
+            'blue_mean': np.random.rand() * 255,
+            'label': np.random.randint(0, 2)
+        }
+        data.append(sample)
+
+    df = pd.DataFrame(data)
+
+    X = df.drop('label', axis=1)
+    y = df['label']
+
+    model = RandomForestClassifier()
+    model.fit(X, y)
+
+    os.makedirs("models", exist_ok=True)
+    joblib.dump(model, "models/model.pkl")
+
+    print("✅ Model trained & saved!")
+
+
+# =========================
+# PREDICTION
+# =========================
+def predict(image_path):
+    if not os.path.exists("models/model.pkl"):
+        train_model()
+
+    model = joblib.load("models/model.pkl")
+
+    # Simulated signals (replace with real sensors later)
+    ppg_signal = np.random.rand(100)
+    temp_signal = np.random.uniform(30, 37, 50)
+
+    ppg_features = extract_ppg_features(ppg_signal)
+    temp_features = extract_temp_features(temp_signal)
+    image_features = extract_image_features(image_path)
+
+    # Combine all features
+    features = {**ppg_features, **temp_features, **image_features}
+
+    X = np.array(list(features.values())).reshape(1, -1)
+
+    prediction = model.predict(X)[0]
+    probability = model.predict_proba(X)[0][1]
+
+    print("\n===== RESULT =====")
+    print(f"Risk Probability: {probability:.2f}")
+
+    if prediction == 1:
+        print("⚠️ Risk of circulatory issue detected")
     else:
-        state = "NORMAL"
-        color = "green"
+        print("✅ Normal circulation")
 
-    st.markdown(f'<div class="result" style="color:{color}">{state}</div>', unsafe_allow_html=True)
 
-    # -------- GRAPH --------
-    t = np.linspace(0, 5, 200)
-    signal = 0.6 * np.sin(2 * np.pi * (hr/60) * t)
-    signal += 0.05 * np.random.randn(len(t))
+# =========================
+# MAIN
+# =========================
+if __name__ == "__main__":
+    print("🔍 Fingertip Circulation Predictor")
 
-    st.line_chart(signal)
+    image_path = input("Enter fingertip image path: ")
 
-    # -------- TABLE --------
-    st.subheader("📊 Live Data Table")
-
-    data = pd.DataFrame({
-        "Heart Rate": [hr],
-        "RMSSD": [rmssd],
-        "SDNN": [sdnn],
-        "State": [state]
-    })
-
-    st.dataframe(data, use_container_width=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ================= QUIZ =================
-with tab2:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-
-    st.subheader("🧠 Advanced Stress Quiz")
-
-    q1 = st.radio("1. Do you feel tired often?", ["Yes", "No"])
-    q2 = st.radio("2. Sleep quality?", ["Good", "Average", "Bad"])
-    q3 = st.radio("3. Mood today?", ["Happy", "Neutral", "Stressed"])
-    q4 = st.radio("4. Do you feel anxious?", ["Yes", "Sometimes", "No"])
-    q5 = st.radio("5. Work pressure?", ["Low", "Medium", "High"])
-    q6 = st.radio("6. Do you overthink?", ["Yes", "No"])
-    q7 = st.radio("7. Energy level?", ["High", "Normal", "Low"])
-    q8 = st.radio("8. Focus level?", ["Good", "Average", "Poor"])
-
-    if st.button("Calculate Stress"):
-
-        score = 0
-
-        if q1 == "Yes": score += 1
-        if q2 == "Bad": score += 2
-        if q3 == "Stressed": score += 2
-        if q4 == "Yes": score += 2
-        if q4 == "Sometimes": score += 1
-        if q5 == "High": score += 2
-        if q6 == "Yes": score += 1
-        if q7 == "Low": score += 2
-        if q8 == "Poor": score += 2
-
-        # -------- RESULT --------
-        if score >= 8:
-            result = "HIGH STRESS"
-            color = "red"
-        elif score >= 4:
-            result = "MODERATE STRESS"
-            color = "orange"
-        else:
-            result = "LOW STRESS"
-            color = "green"
-
-        st.markdown(f'<div class="result" style="color:{color}">{result}</div>', unsafe_allow_html=True)
-
-        # -------- TABLE --------
-        st.subheader("📋 Quiz Summary")
-
-        quiz_data = pd.DataFrame({
-            "Score": [score],
-            "Stress Level": [result]
-        })
-
-        st.table(quiz_data)
-
-    st.markdown('</div>', unsafe_allow_html=True)
+    try:
+        predict(image_path)
+    except Exception as e:
+        print(e)
