@@ -1,142 +1,144 @@
 import streamlit as st
 import numpy as np
-import pandas as pd
-import cv2
-import os
-import joblib
-from sklearn.ensemble import RandomForestClassifier
 
 # =========================
-# STYLE
+# STYLE (MASS UI)
 # =========================
 st.markdown("""
 <style>
-.big-title {font-size:30px; font-weight:bold;}
-.result {font-size:24px; font-weight:bold;}
-.card {padding:20px; border-radius:10px; background:#111;}
+body {background-color:#0e1117;}
+.big-title {
+    font-size:36px;
+    font-weight:bold;
+    text-align:center;
+    color:#00FFD1;
+}
+.card {
+    padding:20px;
+    border-radius:15px;
+    background:#161b22;
+    margin-bottom:20px;
+}
+.result {
+    font-size:26px;
+    font-weight:bold;
+    text-align:center;
+}
+.sub {
+    font-size:18px;
+    color:#9aa4b2;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # =========================
-# MODEL
-# =========================
-def train_model():
-    data = []
-    for _ in range(300):
-        sample = {
-            'brightness': np.random.rand()*255,
-            'contrast': np.random.rand(),
-            'red_mean': np.random.rand()*255,
-            'green_mean': np.random.rand()*255,
-            'blue_mean': np.random.rand()*255,
-            'label': np.random.randint(0,2)
-        }
-        data.append(sample)
-
-    df = pd.DataFrame(data)
-    X = df.drop('label', axis=1)
-    y = df['label']
-
-    model = RandomForestClassifier()
-    model.fit(X, y)
-
-    os.makedirs("models", exist_ok=True)
-    joblib.dump(model, "models/skin_model.pkl")
-
-def load_model():
-    if not os.path.exists("models/skin_model.pkl"):
-        train_model()
-    return joblib.load("models/skin_model.pkl")
-
-# =========================
-# FEATURE EXTRACTION
-# =========================
-def extract_features(image):
-    img = cv2.resize(image,(100,100))
-
-    brightness = np.mean(img)
-    contrast = np.std(img)
-
-    mean = img.mean(axis=(0,1))
-
-    return {
-        'brightness': brightness,
-        'contrast': contrast,
-        'blue_mean': mean[0],
-        'green_mean': mean[1],
-        'red_mean': mean[2]
-    }
-
-# =========================
 # TITLE
 # =========================
-st.markdown('<div class="big-title">AI Skin Health Dashboard</div>', unsafe_allow_html=True)
-
-tab1, tab2 = st.tabs(["📸 Analyzer","📊 Report"])
+st.markdown('<div class="big-title">🧠 AI Health Assistant</div>', unsafe_allow_html=True)
 
 # =========================
-# TAB 1
+# TABS
+# =========================
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🎯 Aim",
+    "⚙️ Procedure",
+    "📸 Analyzer",
+    "🧠 Quiz"
+])
+
+# =========================
+# AIM
 # =========================
 with tab1:
     st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    uploaded = st.file_uploader("Upload Skin Image", type=["jpg","png"])
-
-    if uploaded:
-        file_bytes = np.asarray(bytearray(uploaded.read()),dtype=np.uint8)
-        image = cv2.imdecode(file_bytes,1)
-
-        st.image(image, use_column_width=True)
-
-        if st.button("Analyze"):
-            model = load_model()
-
-            features = extract_features(image)
-            X = np.array(list(features.values())).reshape(1,-1)
-
-            pred = model.predict(X)[0]
-            prob = model.predict_proba(X)[0][1]
-
-            st.subheader("Result")
-            st.write(f"Probability: {prob:.2f}")
-
-            if pred==1:
-                st.error("⚠️ Acne / Skin Issue Detected")
-            else:
-                st.success("✅ Healthy Skin")
-
-            st.session_state['result'] = pred
-            st.session_state['prob'] = prob
+    st.markdown("### 🎯 Aim")
+    st.markdown("""
+<div class="sub">
+This AI system analyzes user input (image + responses) to estimate basic health condition.
+It simulates intelligent decision-making without heavy ML models.
+</div>
+""", unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
-# TAB 2
+# PROCEDURE
 # =========================
 with tab2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    if 'result' in st.session_state:
-        result = st.session_state['result']
-        prob = st.session_state['prob']
+    st.markdown("### ⚙️ Procedure")
+    st.markdown("""
+<div class="sub">
+1. User uploads an image  
+2. System extracts simulated features  
+3. Score is calculated using logic  
+4. Quiz answers are added  
+5. Final health condition is predicted  
+</div>
+""", unsafe_allow_html=True)
 
-        if result==1:
-            state="Skin Issue"
-            color="red"
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# =========================
+# ANALYZER
+# =========================
+with tab3:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    uploaded = st.file_uploader("Upload Image", type=["jpg","png"])
+
+    if uploaded:
+        st.image(uploaded, use_column_width=True)
+
+        if st.button("🔍 Analyze Image"):
+            brightness = np.random.uniform(50,200)
+            contrast = np.random.uniform(0,100)
+
+            image_score = brightness + contrast
+            st.session_state['image_score'] = image_score
+
+            st.success("Image processed successfully!")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# =========================
+# QUIZ + FINAL RESULT
+# =========================
+with tab4:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    st.markdown("### 🧠 Health Quiz")
+
+    q1 = st.radio("Do you feel tired?", ["Yes","No"])
+    q2 = st.radio("Sleep quality?", ["Good","Average","Bad"])
+    q3 = st.radio("Stress level?", ["Low","Medium","High"])
+
+    quiz_score = 0
+
+    if q1 == "Yes": quiz_score += 2
+    if q2 == "Bad": quiz_score += 2
+    if q3 == "High": quiz_score += 2
+
+    if st.button("⚡ Get Final Result"):
+
+        image_score = st.session_state.get('image_score', 100)
+
+        total = image_score/100 + quiz_score
+
+        if total > 5:
+            result = "⚠️ Risk Detected"
+            color = "red"
+        elif total > 3:
+            result = "⚡ Moderate Condition"
+            color = "orange"
         else:
-            state="Healthy"
-            color="green"
+            result = "✅ Healthy"
+            color = "green"
 
-        st.markdown(f'<div class="result" style="color:{color}">{state}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="result" style="color:{color}">{result}</div>', unsafe_allow_html=True)
 
-        df = pd.DataFrame({
-            "Condition":[state],
-            "Probability":[prob]
-        })
-
-        st.table(df)
-
-    else:
-        st.write("Run analysis first...")
+        st.write(f"Score: {total:.2f}")
 
     st.markdown('</div>', unsafe_allow_html=True)
