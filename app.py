@@ -2,20 +2,15 @@ import streamlit as st
 import numpy as np
 
 # =========================
-# PAGE CONFIG
-# =========================
-st.set_page_config(page_title="AI Health Assistant", layout="centered")
-
-# =========================
 # STYLE
 # =========================
 st.markdown("""
 <style>
 .big-title {
-    font-size:32px;
+    font-size:34px;
     font-weight:bold;
     text-align:center;
-    color:#00FFD1;
+    color:#FF4B4B;
 }
 .card {
     padding:20px;
@@ -24,7 +19,7 @@ st.markdown("""
     margin-bottom:15px;
 }
 .result {
-    font-size:24px;
+    font-size:26px;
     font-weight:bold;
     text-align:center;
 }
@@ -34,25 +29,26 @@ st.markdown("""
 # =========================
 # TITLE
 # =========================
-st.markdown('<div class="big-title">🧠 AI Health Assistant</div>', unsafe_allow_html=True)
+st.markdown('<div class="big-title">🧬 Clinical Cancer Risk AI</div>', unsafe_allow_html=True)
+
+tab1, tab2, tab3 = st.tabs(["🎯 Aim & Theory","⚙️ Procedure","🧠 Assessment"])
 
 # =========================
-# TABS
-# =========================
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🎯 Aim",
-    "⚙️ Procedure",
-    "📸 Analyzer",
-    "🧠 Quiz"
-])
-
-# =========================
-# AIM
+# AIM + THEORY
 # =========================
 with tab1:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("Aim")
-    st.write("This app simulates an AI system to analyze health condition using image + quiz logic.")
+
+    st.subheader("🎯 Aim")
+    st.write("To assess potential cancer risk based on clinical symptoms and user input.")
+
+    st.subheader("🧠 Theory")
+    st.write("""
+This system uses symptom-based scoring inspired by clinical screening methods.
+Higher symptom intensity → higher risk score.
+This is NOT a diagnostic tool, only a risk indicator.
+""")
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
@@ -60,71 +56,75 @@ with tab1:
 # =========================
 with tab2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("Procedure")
+
+    st.subheader("⚙️ Procedure")
     st.write("""
-1. Upload an image  
-2. System generates features  
-3. User answers quiz  
-4. Final result is predicted  
+1. User answers 10 clinical questions  
+2. System calculates risk score  
+3. Optional image uploaded  
+4. Combined analysis performed  
+5. Final risk result displayed  
 """)
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
-# ANALYZER
+# ASSESSMENT
 # =========================
 with tab3:
     st.markdown('<div class="card">', unsafe_allow_html=True)
 
+    st.subheader("🧠 Clinical Questions")
+
+    q1 = st.radio("1. Unexplained weight loss?", ["No","Yes"])
+    q2 = st.radio("2. Persistent fatigue?", ["No","Yes"])
+    q3 = st.radio("3. Chronic pain?", ["No","Yes"])
+    q4 = st.radio("4. Lump or swelling?", ["No","Yes"])
+    q5 = st.radio("5. Skin changes?", ["No","Yes"])
+    q6 = st.radio("6. Persistent cough?", ["No","Yes"])
+    q7 = st.radio("7. Difficulty swallowing?", ["No","Yes"])
+    q8 = st.radio("8. Unusual bleeding?", ["No","Yes"])
+    q9 = st.radio("9. Appetite loss?", ["No","Yes"])
+    q10 = st.radio("10. Family history of cancer?", ["No","Yes"])
+
+    # ================= IMAGE UPLOAD =================
+    st.subheader("📸 Optional Image Upload")
     file = st.file_uploader("Upload Image", type=["jpg","png"])
 
     if file:
         st.image(file, use_column_width=True)
 
-        if st.button("🔍 Analyze Image"):
-            brightness = np.random.uniform(50, 200)
-            contrast = np.random.uniform(0, 100)
+    # ================= SCORING =================
+    score = 0
 
-            image_score = brightness + contrast
-            st.session_state["image_score"] = image_score
+    answers = [q1,q2,q3,q4,q5,q6,q7,q8,q9,q10]
 
-            st.success("Image analyzed successfully!")
+    for ans in answers:
+        if ans == "Yes":
+            score += 1
 
-    st.markdown('</div>', unsafe_allow_html=True)
+    # image simulation effect
+    if file:
+        score += np.random.randint(0,3)
 
-# =========================
-# QUIZ + RESULT
-# =========================
-with tab4:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    # ================= RESULT =================
+    if st.button("🔍 Analyze Risk"):
 
-    st.subheader("Health Quiz")
-
-    q1 = st.radio("Do you feel tired?", ["Yes", "No"])
-    q2 = st.radio("Sleep quality?", ["Good", "Average", "Bad"])
-    q3 = st.radio("Stress level?", ["Low", "Medium", "High"])
-
-    quiz_score = 0
-    if q1 == "Yes": quiz_score += 2
-    if q2 == "Bad": quiz_score += 2
-    if q3 == "High": quiz_score += 2
-
-    if st.button("⚡ Get Result"):
-
-        image_score = st.session_state.get("image_score", 100)
-
-        total = (image_score / 100) + quiz_score
-
-        if total > 5:
-            result = "⚠️ Risk Detected"
+        if score >= 8:
+            result = "⚠️ HIGH RISK"
             color = "red"
-        elif total > 3:
-            result = "⚡ Moderate Condition"
+            advice = "Immediate medical consultation required"
+        elif score >= 4:
+            result = "⚡ MODERATE RISK"
             color = "orange"
+            advice = "Regular check-up recommended"
         else:
-            result = "✅ Healthy"
+            result = "✅ LOW RISK"
             color = "green"
+            advice = "Maintain healthy lifestyle"
 
         st.markdown(f'<div class="result" style="color:{color}">{result}</div>', unsafe_allow_html=True)
-        st.write(f"Score: {total:.2f}")
+        st.write(f"Risk Score: {score}/10")
+        st.info(advice)
 
     st.markdown('</div>', unsafe_allow_html=True)
