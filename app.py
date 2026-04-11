@@ -1,130 +1,200 @@
-import streamlit as st
-import numpy as np
+import random
 
-# =========================
-# STYLE
-# =========================
-st.markdown("""
-<style>
-.big-title {
-    font-size:34px;
-    font-weight:bold;
-    text-align:center;
-    color:#FF4B4B;
+# ------------------------------
+# TRAINING DATA
+# ------------------------------
+data = [
+    "i feel low and tired",
+    "i am happy today",
+    "i feel confused about life",
+    "sometimes i feel alone",
+    "i am feeling better now",
+    "i don't know what to do",
+    "everything feels heavy",
+    "i want to improve myself",
+    "i feel stressed and anxious",
+    "today was a good day"
+]
+
+# ------------------------------
+# TOKENIZATION
+# ------------------------------
+def tokenize(sentence):
+    return sentence.lower().split()
+
+tokens = []
+for sentence in data:
+    tokens.extend(tokenize(sentence))
+
+vocab = list(set(tokens))
+
+# ------------------------------
+# BIGRAM MODEL
+# ------------------------------
+bigram_counts = {}
+
+for sentence in data:
+    words = ["<start>"] + tokenize(sentence) + ["<end>"]
+    for i in range(len(words)-1):
+        pair = (words[i], words[i+1])
+        bigram_counts[pair] = bigram_counts.get(pair, 0) + 1
+
+bigram_prob = {}
+
+for (w1, w2), count in bigram_counts.items():
+    total = sum(c for (x, y), c in bigram_counts.items() if x == w1)
+    bigram_prob.setdefault(w1, {})
+    bigram_prob[w1][w2] = count / total
+
+# ------------------------------
+# SAMPLING
+# ------------------------------
+def sample_next(word, temperature=0.85):
+    if word not in bigram_prob:
+        return "<end>"
+
+    choices = list(bigram_prob[word].keys())
+    probs = list(bigram_prob[word].values())
+
+    probs = [p ** (1/temperature) for p in probs]
+    total = sum(probs)
+    probs = [p / total for p in probs]
+
+    return random.choices(choices, probs)[0]
+
+# ------------------------------
+# GENERATE SENTENCE
+# ------------------------------
+def generate_sentence(max_len=12):
+    word = "<start>"
+    result = []
+
+    for _ in range(max_len):
+        word = sample_next(word)
+
+        if word == "<end>":
+            break
+
+        result.append(word)
+
+    return " ".join(result)
+
+# ------------------------------
+# NLP (EMOTION DETECTION)
+# ------------------------------
+emotion_keywords = {
+    "low": ["sad", "tired", "alone", "low", "depressed"],
+    "happy": ["happy", "good", "great", "better"],
+    "confused": ["confused", "don't know", "lost"],
+    "stress": ["stress", "anxious", "pressure"]
 }
-.card {
-    padding:20px;
-    border-radius:12px;
-    background:#111;
-    margin-bottom:15px;
-}
-.result {
-    font-size:26px;
-    font-weight:bold;
-    text-align:center;
-}
-</style>
-""", unsafe_allow_html=True)
 
-# =========================
-# TITLE
-# =========================
-st.markdown('<div class="big-title">🧬 Clinical Cancer Risk AI</div>', unsafe_allow_html=True)
+def detect_emotion(user_input):
+    user_input = user_input.lower()
 
-tab1, tab2, tab3 = st.tabs(["🎯 Aim & Theory","⚙️ Procedure","🧠 Assessment"])
+    for emotion, words in emotion_keywords.items():
+        for w in words:
+            if w in user_input:
+                return emotion
 
-# =========================
-# AIM + THEORY
-# =========================
-with tab1:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    return "neutral"
 
-    st.subheader("🎯 Aim")
-    st.write("To assess potential cancer risk based on clinical symptoms and user input.")
+# ------------------------------
+# MEMORY
+# ------------------------------
+memory = []
+MAX_MEMORY = 5
 
-    st.subheader("🧠 Theory")
-    st.write("""
-This system uses symptom-based scoring inspired by clinical screening methods.
-Higher symptom intensity → higher risk score.
-This is NOT a diagnostic tool, only a risk indicator.
-""")
+def update_memory(user_input, emotion):
+    memory.append({"text": user_input, "emotion": emotion})
+    if len(memory) > MAX_MEMORY:
+        memory.pop(0)
 
-    st.markdown('</div>', unsafe_allow_html=True)
+def get_memory_context():
+    if not memory:
+        return "neutral"
 
-# =========================
-# PROCEDURE
-# =========================
-with tab2:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    emotions = [m["emotion"] for m in memory]
+    return max(set(emotions), key=emotions.count)
 
-    st.subheader("⚙️ Procedure")
-    st.write("""
-1. User answers 10 clinical questions  
-2. System calculates risk score  
-3. Optional image uploaded  
-4. Combined analysis performed  
-5. Final risk result displayed  
-""")
+# ------------------------------
+# HUMAN RESPONSE ENGINE
+# ------------------------------
+def humanize(base_text, emotion):
+    starters = [
+        "hmm...",
+        "i see...",
+        "okay...",
+        "right...",
+        "yeah..."
+    ]
 
-    st.markdown('</div>', unsafe_allow_html=True)
+    questions = [
+        "what do you think is causing it?",
+        "has this been happening often?",
+        "when did this start?",
+        "does it stay or come and go?"
+    ]
 
-# =========================
-# ASSESSMENT
-# =========================
-with tab3:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    prefix = random.choice(starters)
 
-    st.subheader("🧠 Clinical Questions")
+    if emotion == "low":
+        extra = random.choice([
+            "that sounds really heavy...",
+            "that must feel draining..."
+        ])
+    elif emotion == "stress":
+        extra = random.choice([
+            "that seems like a lot to handle...",
+            "that's quite intense..."
+        ])
+    elif emotion == "happy":
+        extra = random.choice([
+            "that’s actually nice to hear...",
+            "sounds like a good moment..."
+        ])
+    else:
+        extra = ""
 
-    q1 = st.radio("1. Unexplained weight loss?", ["No","Yes"])
-    q2 = st.radio("2. Persistent fatigue?", ["No","Yes"])
-    q3 = st.radio("3. Chronic pain?", ["No","Yes"])
-    q4 = st.radio("4. Lump or swelling?", ["No","Yes"])
-    q5 = st.radio("5. Skin changes?", ["No","Yes"])
-    q6 = st.radio("6. Persistent cough?", ["No","Yes"])
-    q7 = st.radio("7. Difficulty swallowing?", ["No","Yes"])
-    q8 = st.radio("8. Unusual bleeding?", ["No","Yes"])
-    q9 = st.radio("9. Appetite loss?", ["No","Yes"])
-    q10 = st.radio("10. Family history of cancer?", ["No","Yes"])
+    question = random.choice(questions)
 
-    # ================= IMAGE UPLOAD =================
-    st.subheader("📸 Optional Image Upload")
-    file = st.file_uploader("Upload Image", type=["jpg","png"])
+    return f"{prefix} {extra} {base_text}. {question}"
 
-    if file:
-        st.image(file, use_column_width=True)
+# ------------------------------
+# RESPONSE GENERATION
+# ------------------------------
+def generate_response(user_input):
+    emotion = detect_emotion(user_input)
+    update_memory(user_input, emotion)
 
-    # ================= SCORING =================
-    score = 0
+    memory_emotion = get_memory_context()
 
-    answers = [q1,q2,q3,q4,q5,q6,q7,q8,q9,q10]
+    base = generate_sentence()
 
-    for ans in answers:
-        if ans == "Yes":
-            score += 1
+    response = humanize(base, memory_emotion)
 
-    # image simulation effect
-    if file:
-        score += np.random.randint(0,3)
+    return response
 
-    # ================= RESULT =================
-    if st.button("🔍 Analyze Risk"):
+# ------------------------------
+# SIMPLE UI (TERMINAL STYLE)
+# ------------------------------
+def start_chat():
+    print("\n==============================")
+    print("   MINI AI COMPANION STARTED")
+    print("==============================\n")
 
-        if score >= 8:
-            result = "⚠️ HIGH RISK"
-            color = "red"
-            advice = "Immediate medical consultation required"
-        elif score >= 4:
-            result = "⚡ MODERATE RISK"
-            color = "orange"
-            advice = "Regular check-up recommended"
-        else:
-            result = "✅ LOW RISK"
-            color = "green"
-            advice = "Maintain healthy lifestyle"
+    while True:
+        user = input("You: ")
 
-        st.markdown(f'<div class="result" style="color:{color}">{result}</div>', unsafe_allow_html=True)
-        st.write(f"Risk Score: {score}/10")
-        st.info(advice)
+        if user.lower() == "exit":
+            print("AI: take care... see you soon.")
+            break
 
-    st.markdown('</div>', unsafe_allow_html=True)
+        response = generate_response(user)
+        print("AI:", response)
+
+# ------------------------------
+# RUN
+# ------------------------------
+if __name__ == "__main__":
+    start_chat()
