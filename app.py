@@ -34,10 +34,10 @@ now = datetime.datetime.now()
 st.markdown(f"<div class='header'><div>ADA</div><div>{now.strftime('%H:%M:%S')}</div></div>", unsafe_allow_html=True)
 st.markdown("<div class='orb'></div>", unsafe_allow_html=True)
 
-# ================= DATA GENERATOR =================
+# ================= PATTERN GENERATOR =================
 def expand(base):
     prefixes = ["i am","i feel","im","feeling","right now i feel","lately i feel","sometimes i feel"]
-    suffixes = ["","so much","a lot","today","these days","again","inside"]
+    suffixes = ["","so much","a lot","today","these days","again","inside","very strongly"]
     data = []
     for b in base:
         for p in prefixes:
@@ -45,56 +45,49 @@ def expand(base):
                 data.append(f"{p} {b} {s}".strip())
     return data
 
-# ================= EMOTION DATA =================
+# ================= 12 EMOTIONS =================
 DATA = {
-"happy": expand(["happy","good","great","amazing","awesome","joyful","excited","positive"]),
-"sad": expand(["sad","down","depressed","empty","broken","hurt","lost","hopeless"]),
-"stress": expand(["stressed","overwhelmed","pressured","tired","burnt out","anxious","tense"]),
-"love": expand(["in love","love her","love someone","like a girl","crush","miss her"]),
-"angry": expand(["angry","mad","frustrated","irritated","furious","rage"]),
-"lonely": expand(["alone","lonely","isolated","ignored","no one cares","no friends"]),
-"fear": expand(["scared","afraid","nervous","worried","panic","fear"]),
-"motivation": expand(["lazy","no motivation","no energy","cant focus","need motivation"])
+"happy": expand(["happy","joyful","excited","great","amazing"]),
+"sad": expand(["sad","depressed","down","hopeless","empty"]),
+"stress": expand(["stressed","overwhelmed","pressure","burnt out","tense"]),
+"love": expand(["in love","love someone","crush","romantic","attached"]),
+"angry": expand(["angry","mad","furious","frustrated","irritated"]),
+"lonely": expand(["lonely","alone","isolated","ignored","no friends"]),
+"fear": expand(["scared","afraid","panic","nervous","worried"]),
+"motivation": expand(["lazy","no motivation","tired","cant focus","low energy"]),
+"confidence": expand(["confident","strong","capable","ready","bold"]),
+"confusion": expand(["confused","lost","dont understand","unclear","doubt"]),
+"jealous": expand(["jealous","insecure","comparing","envy","feeling less"]),
+"guilt": expand(["guilty","regret","ashamed","mistake","bad feeling"])
 }
 
-# ================= GENERAL INTENTS =================
-DATA["greeting"] = [
-"hi","hello","hey","hii","yo","sup","good morning","good evening"
-]
-
-DATA["name"] = [
-"what is your name","who are you","your name","tell me your name"
-]
-
-DATA["creator"] = [
-"who created you","who made you","your creator","who built you"
-]
-
-DATA["help"] = [
-"what can you do","help me","features","what do you know"
-]
+# ================= GENERAL =================
+DATA["greeting"] = ["hi","hello","hey","yo"]
+DATA["name"] = ["what is your name","who are you"]
+DATA["creator"] = ["who created you","who made you"]
 
 # ================= RESPONSES =================
 RESPONSES = {
-"happy":["Nice 😄 keep going!","Love that energy 🔥"],
-"sad":["I’m here 💙 tell me more","You’re not alone"],
+"happy":["Nice 😄","Love that energy 🔥"],
+"sad":["I'm here 💙","You're not alone"],
 "stress":["Breathe slowly","One step at a time"],
-"love":["Ohh nice 🙂 tell me more","That’s sweet 😏"],
+"love":["That’s nice 🙂","Tell me more"],
 "angry":["Calm down first","What happened?"],
-"lonely":["I’m here with you","Talk to me"],
-"fear":["You’ll be okay","Face it slowly"],
-"motivation":["Start now 🔥","Discipline wins"],
+"lonely":["I'm here with you","Talk to me"],
+"fear":["You're safe","Take it slow"],
+"motivation":["Start now 🔥","You got this"],
+"confidence":["That’s powerful 💪","Keep going"],
+"confusion":["Let’s figure it out","Explain more"],
+"jealous":["Focus on yourself","You’re enough"],
+"guilt":["It’s okay to learn","Forgive yourself"],
 
-"greeting":["Hey 👋","Hello!","Hi there!"],
-"name":["I am ADA — your AI assistant."],
-"creator":["I was created by Srinivash 🔥"],
-"help":["I can chat, understand emotions, and support you."]
+"greeting":["Hey 👋","Hello!"],
+"name":["I am ADA."],
+"creator":["I was created by Srinivash 🔥"]
 }
 
 # ================= NLP TRAIN =================
-sentences = []
-tags = []
-
+sentences, tags = [], []
 for tag, patterns in DATA.items():
     for p in patterns:
         sentences.append(p)
@@ -105,6 +98,16 @@ X = vectorizer.fit_transform(sentences)
 
 # ================= AI =================
 def predict(text):
+    t = text.lower()
+
+    # 🚨 SAFETY LAYER
+    if any(x in t for x in ["dead","die","suicide","kill myself"]):
+        return "Hey… I'm really concerned. You're not alone 💙 please talk to someone you trust."
+
+    if any(x in t for x in ["depressed","hopeless"]):
+        return "I'm here for you 💙 tell me more."
+
+    # 🤖 NLP
     vec = vectorizer.transform([text])
     sim = cosine_similarity(vec, X)
     idx = sim.argmax()
@@ -112,11 +115,7 @@ def predict(text):
     confidence = sim[0][idx]
 
     if confidence < 0.25:
-        return random.choice([
-            "Tell me more...",
-            "I’m listening...",
-            "Explain more..."
-        ])
+        return "Tell me more..."
 
     return random.choice(RESPONSES[tag])
 
@@ -128,7 +127,7 @@ msg = st.text_input("Talk to ADA...")
 
 if st.button("SEND"):
     if msg:
-        reply = predict(msg.lower())
+        reply = predict(msg)
         st.session_state.chat.append(("user",msg))
         st.session_state.chat.append(("bot",reply))
 
