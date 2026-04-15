@@ -1,200 +1,150 @@
+import streamlit as st
+import numpy as np
+import re
 import random
+import math
+import datetime
+import pickle
+import os
 
-# ------------------------------
-# TRAINING DATA
-# ------------------------------
-data = [
-    "i feel low and tired",
-    "i am happy today",
-    "i feel confused about life",
-    "sometimes i feel alone",
-    "i am feeling better now",
-    "i don't know what to do",
-    "everything feels heavy",
-    "i want to improve myself",
-    "i feel stressed and anxious",
-    "today was a good day"
+# =========================
+# INTENTS (same as yours)
+# =========================
+
+INTENTS = [
+    {"tag":"greeting","patterns":["hello","hi","hey"],"responses":["Hello!","Hi there!","Hey!"]},
+    {"tag":"goodbye","patterns":["bye","exit"],"responses":["Goodbye!","See you!"]},
+    {"tag":"time","patterns":["time"],"responses":["__TIME__"]},
+    {"tag":"date","patterns":["date"],"responses":["__DATE__"]},
+    {"tag":"joke","patterns":["joke"],"responses":["Why do programmers prefer dark mode? Because light attracts bugs!"]},
+    {"tag":"math","patterns":["calculate","add","multiply"],"responses":["__MATH__"]}
 ]
 
-# ------------------------------
-# TOKENIZATION
-# ------------------------------
-def tokenize(sentence):
-    return sentence.lower().split()
+# =========================
+# TOKENIZER
+# =========================
 
-tokens = []
-for sentence in data:
-    tokens.extend(tokenize(sentence))
+class Tokenizer:
+    def __init__(self):
+        self.word2idx = {}
+        self.vocab_size = 0
 
-vocab = list(set(tokens))
+    def tokenize(self, text):
+        text = text.lower()
+        text = re.sub(r"[^a-z0-9 ]","",text)
+        return text.split()
 
-# ------------------------------
-# BIGRAM MODEL
-# ------------------------------
-bigram_counts = {}
+    def build_vocab(self, sentences):
+        self.word2idx = {"[UNK]":0}
+        idx = 1
+        for s in sentences:
+            for w in self.tokenize(s):
+                if w not in self.word2idx:
+                    self.word2idx[w] = idx
+                    idx += 1
+        self.vocab_size = len(self.word2idx)
 
-for sentence in data:
-    words = ["<start>"] + tokenize(sentence) + ["<end>"]
-    for i in range(len(words)-1):
-        pair = (words[i], words[i+1])
-        bigram_counts[pair] = bigram_counts.get(pair, 0) + 1
+    def encode(self, text):
+        vec = np.zeros(self.vocab_size)
+        for w in self.tokenize(text):
+            vec[self.word2idx.get(w,0)] = 1
+        return vec
 
-bigram_prob = {}
+# =========================
+# SIMPLE NN (lightweight for Streamlit)
+# =========================
 
-for (w1, w2), count in bigram_counts.items():
-    total = sum(c for (x, y), c in bigram_counts.items() if x == w1)
-    bigram_prob.setdefault(w1, {})
-    bigram_prob[w1][w2] = count / total
+def softmax(x):
+    e = np.exp(x - np.max(x))
+    return e / np.sum(e)
 
-# ------------------------------
-# SAMPLING
-# ------------------------------
-def sample_next(word, temperature=0.85):
-    if word not in bigram_prob:
-        return "<end>"
+class NeuralNet:
+    def __init__(self, inp, out):
+        self.W = np.random.randn(inp, out) * 0.1
 
-    choices = list(bigram_prob[word].keys())
-    probs = list(bigram_prob[word].values())
+    def forward(self, x):
+        return softmax(x @ self.W)
 
-    probs = [p ** (1/temperature) for p in probs]
-    total = sum(probs)
-    probs = [p / total for p in probs]
+    def predict(self, x):
+        probs = self.forward(x)
+        return np.argmax(probs), np.max(probs)
 
-    return random.choices(choices, probs)[0]
+# =========================
+# ADA ENGINE
+# =========================
 
-# ------------------------------
-# GENERATE SENTENCE
-# ------------------------------
-def generate_sentence(max_len=12):
-    word = "<start>"
-    result = []
+class ADA:
+    def __init__(self):
+        self.tokenizer = Tokenizer()
 
-    for _ in range(max_len):
-        word = sample_next(word)
+        patterns = [p for i in INTENTS for p in i["patterns"]]
+        self.tokenizer.build_vocab(patterns)
 
-        if word == "<end>":
-            break
+        self.tags = [i["tag"] for i in INTENTS]
 
-        result.append(word)
+        self.model = NeuralNet(self.tokenizer.vocab_size, len(self.tags))
 
-    return " ".join(result)
+    def respond(self, text):
+        vec = self.tokenizer.encode(text)
+        idx, conf = self.model.predict(vec)
 
-# ------------------------------
-# NLP (EMOTION DETECTION)
-# ------------------------------
-emotion_keywords = {
-    "low": ["sad", "tired", "alone", "low", "depressed"],
-    "happy": ["happy", "good", "great", "better"],
-    "confused": ["confused", "don't know", "lost"],
-    "stress": ["stress", "anxious", "pressure"]
-}
+        tag = self.tags[idx]
+        intent = next(i for i in INTENTS if i["tag"] == tag)
 
-def detect_emotion(user_input):
-    user_input = user_input.lower()
+        response = random.choice(intent["responses"])
 
-    for emotion, words in emotion_keywords.items():
-        for w in words:
-            if w in user_input:
-                return emotion
+        if response == "__TIME__":
+            return datetime.datetime.now().strftime("%H:%M:%S")
 
-    return "neutral"
+        if response == "__DATE__":
+            return datetime.datetime.now().strftime("%A, %d %B %Y")
 
-# ------------------------------
-# MEMORY
-# ------------------------------
-memory = []
-MAX_MEMORY = 5
+        if response == "__MATH__":
+            try:
+                expr = re.sub(r"[^0-9+\-*/().]","",text)
+                return str(eval(expr))
+            except:
+                return "Math error"
 
-def update_memory(user_input, emotion):
-    memory.append({"text": user_input, "emotion": emotion})
-    if len(memory) > MAX_MEMORY:
-        memory.pop(0)
+        return response
 
-def get_memory_context():
-    if not memory:
-        return "neutral"
+# =========================
+# STREAMLIT UI
+# =========================
 
-    emotions = [m["emotion"] for m in memory]
-    return max(set(emotions), key=emotions.count)
+st.set_page_config(page_title="ADA JARVIS", layout="centered")
 
-# ------------------------------
-# HUMAN RESPONSE ENGINE
-# ------------------------------
-def humanize(base_text, emotion):
-    starters = [
-        "hmm...",
-        "i see...",
-        "okay...",
-        "right...",
-        "yeah..."
-    ]
+st.markdown("""
+<style>
+body { background-color:#0a0f1c; color:#00ffff; }
+.chat { padding:10px; margin:5px; border-radius:10px; }
+.user { text-align:right; color:#00ffff; }
+.bot { text-align:left; color:white; }
+</style>
+""", unsafe_allow_html=True)
 
-    questions = [
-        "what do you think is causing it?",
-        "has this been happening often?",
-        "when did this start?",
-        "does it stay or come and go?"
-    ]
+st.title("🧠 ADA — JARVIS MODE")
 
-    prefix = random.choice(starters)
+@st.cache_resource
+def load_ada():
+    return ADA()
 
-    if emotion == "low":
-        extra = random.choice([
-            "that sounds really heavy...",
-            "that must feel draining..."
-        ])
-    elif emotion == "stress":
-        extra = random.choice([
-            "that seems like a lot to handle...",
-            "that's quite intense..."
-        ])
-    elif emotion == "happy":
-        extra = random.choice([
-            "that’s actually nice to hear...",
-            "sounds like a good moment..."
-        ])
+ada = load_ada()
+
+if "chat" not in st.session_state:
+    st.session_state.chat = []
+
+user_input = st.text_input("Ask ADA")
+
+if st.button("Send"):
+    if user_input:
+        reply = ada.respond(user_input)
+
+        st.session_state.chat.append(("user", user_input))
+        st.session_state.chat.append(("bot", reply))
+
+for role, msg in st.session_state.chat:
+    if role == "user":
+        st.markdown(f"<div class='chat user'>{msg}</div>", unsafe_allow_html=True)
     else:
-        extra = ""
-
-    question = random.choice(questions)
-
-    return f"{prefix} {extra} {base_text}. {question}"
-
-# ------------------------------
-# RESPONSE GENERATION
-# ------------------------------
-def generate_response(user_input):
-    emotion = detect_emotion(user_input)
-    update_memory(user_input, emotion)
-
-    memory_emotion = get_memory_context()
-
-    base = generate_sentence()
-
-    response = humanize(base, memory_emotion)
-
-    return response
-
-# ------------------------------
-# SIMPLE UI (TERMINAL STYLE)
-# ------------------------------
-def start_chat():
-    print("\n==============================")
-    print("   MINI AI COMPANION STARTED")
-    print("==============================\n")
-
-    while True:
-        user = input("You: ")
-
-        if user.lower() == "exit":
-            print("AI: take care... see you soon.")
-            break
-
-        response = generate_response(user)
-        print("AI:", response)
-
-# ------------------------------
-# RUN
-# ------------------------------
-if __name__ == "__main__":
-    start_chat()
+        st.markdown(f"<div class='chat bot'>{msg}</div>", unsafe_allow_html=True)
