@@ -425,6 +425,3 @@ _SAFE_OPS = {
     ast.UAdd: operator.pos,
 }
 
-_SAFE_FUNCS = {
-    "sqrt": m
-}
