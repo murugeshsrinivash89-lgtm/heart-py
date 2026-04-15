@@ -2,6 +2,7 @@ import streamlit as st
 import random, datetime
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import streamlit.components.v1 as components
 
 st.set_page_config(layout="wide")
 
@@ -34,10 +35,25 @@ now = datetime.datetime.now()
 st.markdown(f"<div class='header'><div>ADA</div><div>{now.strftime('%H:%M:%S')}</div></div>", unsafe_allow_html=True)
 st.markdown("<div class='orb'></div>", unsafe_allow_html=True)
 
+# ================= VOICE =================
+def speak(text):
+    js = f"""
+    <script>
+    var msg = new SpeechSynthesisUtterance("{text}");
+    var voices = speechSynthesis.getVoices();
+    var female = voices.find(v => v.name.toLowerCase().includes("female")) || voices[1];
+    msg.voice = female;
+    msg.rate = 1;
+    msg.pitch = 1;
+    speechSynthesis.speak(msg);
+    </script>
+    """
+    components.html(js)
+
 # ================= PATTERN GENERATOR =================
 def expand(base):
     prefixes = ["i am","i feel","im","feeling","right now i feel","lately i feel","sometimes i feel"]
-    suffixes = ["","so much","a lot","today","these days","again","inside","very strongly"]
+    suffixes = ["","so much","a lot","today","again","inside","very strongly"]
     data = []
     for b in base:
         for p in prefixes:
@@ -45,23 +61,22 @@ def expand(base):
                 data.append(f"{p} {b} {s}".strip())
     return data
 
-# ================= 12 EMOTIONS =================
+# ================= DATA =================
 DATA = {
 "happy": expand(["happy","joyful","excited","great","amazing"]),
 "sad": expand(["sad","depressed","down","hopeless","empty"]),
 "stress": expand(["stressed","overwhelmed","pressure","burnt out","tense"]),
-"love": expand(["in love","love someone","crush","romantic","attached"]),
-"angry": expand(["angry","mad","furious","frustrated","irritated"]),
-"lonely": expand(["lonely","alone","isolated","ignored","no friends"]),
-"fear": expand(["scared","afraid","panic","nervous","worried"]),
-"motivation": expand(["lazy","no motivation","tired","cant focus","low energy"]),
-"confidence": expand(["confident","strong","capable","ready","bold"]),
-"confusion": expand(["confused","lost","dont understand","unclear","doubt"]),
-"jealous": expand(["jealous","insecure","comparing","envy","feeling less"]),
-"guilt": expand(["guilty","regret","ashamed","mistake","bad feeling"])
+"love": expand(["in love","crush","love someone","romantic"]),
+"angry": expand(["angry","mad","furious","frustrated"]),
+"lonely": expand(["lonely","alone","isolated","no friends"]),
+"fear": expand(["scared","afraid","panic","worried"]),
+"motivation": expand(["lazy","no motivation","cant focus","low energy"]),
+"confidence": expand(["confident","strong","capable"]),
+"confusion": expand(["confused","lost","dont understand"]),
+"jealous": expand(["jealous","insecure","envy"]),
+"guilt": expand(["guilty","regret","my fault"])
 }
 
-# ================= GENERAL =================
 DATA["greeting"] = ["hi","hello","hey","yo"]
 DATA["name"] = ["what is your name","who are you"]
 DATA["creator"] = ["who created you","who made you"]
@@ -70,7 +85,7 @@ DATA["creator"] = ["who created you","who made you"]
 RESPONSES = {
 "happy":["Nice 😄","Love that energy 🔥"],
 "sad":["I'm here 💙","You're not alone"],
-"stress":["Breathe slowly","One step at a time"],
+"stress":["Breathe slowly","Take it step by step"],
 "love":["That’s nice 🙂","Tell me more"],
 "angry":["Calm down first","What happened?"],
 "lonely":["I'm here with you","Talk to me"],
@@ -78,11 +93,11 @@ RESPONSES = {
 "motivation":["Start now 🔥","You got this"],
 "confidence":["That’s powerful 💪","Keep going"],
 "confusion":["Let’s figure it out","Explain more"],
-"jealous":["Focus on yourself","You’re enough"],
-"guilt":["It’s okay to learn","Forgive yourself"],
+"jealous":["You are enough","Focus on yourself"],
+"guilt":["Forgive yourself","Learn and move forward"],
 
 "greeting":["Hey 👋","Hello!"],
-"name":["I am ADA."],
+"name":["I am ADA — your AI assistant."],
 "creator":["I was created by Srinivash 🔥"]
 }
 
@@ -100,14 +115,14 @@ X = vectorizer.fit_transform(sentences)
 def predict(text):
     t = text.lower()
 
-    # 🚨 SAFETY LAYER
+    # SAFETY
     if any(x in t for x in ["dead","die","suicide","kill myself"]):
-        return "Hey… I'm really concerned. You're not alone 💙 please talk to someone you trust."
+        return "Hey… I'm really concerned. You're not alone 💙 please talk to someone."
 
     if any(x in t for x in ["depressed","hopeless"]):
         return "I'm here for you 💙 tell me more."
 
-    # 🤖 NLP
+    # NLP
     vec = vectorizer.transform([text])
     sim = cosine_similarity(vec, X)
     idx = sim.argmax()
@@ -130,6 +145,7 @@ if st.button("SEND"):
         reply = predict(msg)
         st.session_state.chat.append(("user",msg))
         st.session_state.chat.append(("bot",reply))
+        speak(reply)   # 🔥 VOICE OUTPUT
 
 # ================= DISPLAY =================
 for role, m in st.session_state.chat:
