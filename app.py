@@ -1,14 +1,13 @@
 import streamlit as st
-import numpy as np
-import random, re, math, datetime
+import random, re, datetime
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 st.set_page_config(layout="wide")
 
 # ================= UI =================
 st.markdown("""
 <style>
-
-/* BACKGROUND GRID */
 body {
   background-color: #020617;
   background-image:
@@ -16,131 +15,96 @@ body {
     linear-gradient(90deg, rgba(0,255,255,0.05) 1px, transparent 1px);
   background-size: 40px 40px;
 }
-
-/* HEADER */
-.header {
-  display:flex;
-  justify-content:space-between;
-  color:#00f0ff;
-  font-size:20px;
-}
-
-/* ORB */
+.header {display:flex;justify-content:space-between;color:#00f0ff;}
 .orb {
-  width:220px;
-  height:220px;
-  margin:20px auto;
-  border-radius:50%;
+  width:200px;height:200px;margin:auto;border-radius:50%;
   background: radial-gradient(circle,#00f0ff,#001f3f);
-  box-shadow:0 0 120px #00f0ff;
+  box-shadow:0 0 100px #00f0ff;
   animation:pulse 2s infinite;
 }
-
 @keyframes pulse {
-  0%{transform:scale(1)}
-  50%{transform:scale(1.1)}
-  100%{transform:scale(1)}
+  0%{transform:scale(1)}50%{transform:scale(1.1)}100%{transform:scale(1)}
 }
-
-/* CHAT */
-.user {
-  text-align:right;
-  color:#00f0ff;
-  margin:10px;
-}
-.bot {
-  text-align:left;
-  color:white;
-  margin:10px;
-}
-
-/* INPUT */
-.stTextInput input {
-  background:#020617;
-  color:#00f0ff;
-  border:1px solid #00f0ff;
-}
-
-/* BUTTON */
-.stButton button {
-  background:#00f0ff;
-  color:black;
-  box-shadow:0 0 10px #00f0ff;
-}
-
-/* ALERT */
-.alert {
-  border:1px solid red;
-  color:red;
-  padding:10px;
-  margin:10px;
-}
-
+.user{text-align:right;color:#00f0ff;margin:10px;}
+.bot{text-align:left;color:white;margin:10px;}
 </style>
 """, unsafe_allow_html=True)
 
-# ================= HEADER =================
 now = datetime.datetime.now()
-st.markdown(f"""
-<div class="header">
-  <div>AION</div>
-  <div>{now.strftime('%H:%M:%S')} • STANDBY</div>
-</div>
-""", unsafe_allow_html=True)
-
+st.markdown(f"<div class='header'><div>AION</div><div>{now.strftime('%H:%M:%S')}</div></div>", unsafe_allow_html=True)
 st.markdown("<div class='orb'></div>", unsafe_allow_html=True)
 
-# ================= INTENTS =================
-INTENTS = {
-    "hi":["Hello 👋","Hey!"],
-    "name":["I am ADA."],
-    "stress":["I'm here for you.","Take a breath."]
+# ================= DATA GENERATOR =================
+def expand(base):
+    prefixes = ["i am","i feel","im","feeling","right now i feel","lately i feel","sometimes i feel"]
+    suffixes = ["","so much","a lot","today","these days","again","inside"]
+    data = []
+    for b in base:
+        for p in prefixes:
+            for s in suffixes:
+                data.append(f"{p} {b} {s}".strip())
+    return data
+
+# 8 emotions (each ~100 patterns)
+DATA = {
+"happy": expand(["happy","good","great","amazing","awesome","joyful","excited","positive"]),
+"sad": expand(["sad","down","depressed","empty","broken","hurt","lost","hopeless"]),
+"stress": expand(["stressed","overwhelmed","pressured","tired","burnt out","anxious","tense"]),
+"love": expand(["in love","love her","love someone","like a girl","crush","miss her"]),
+"angry": expand(["angry","mad","frustrated","irritated","furious","rage"]),
+"lonely": expand(["alone","lonely","isolated","ignored","no one cares","no friends"]),
+"fear": expand(["scared","afraid","nervous","worried","panic","fear"]),
+"motivation": expand(["lazy","no motivation","no energy","cant focus","need motivation"])
 }
 
-# ================= SIMPLE MODEL =================
-def respond(text):
-    t=text.lower()
+RESPONSES = {
+"happy":["Nice 😄 keep going!","Love that energy 🔥"],
+"sad":["I’m here 💙 tell me more","You’re not alone"],
+"stress":["Breathe slowly","One step at a time"],
+"love":["Ohh nice 🙂 tell me more","That’s sweet 😏"],
+"angry":["Calm down first","What happened?"],
+"lonely":["I’m here with you","Talk to me"],
+"fear":["You’ll be okay","Face it slowly"],
+"motivation":["Start now 🔥","Discipline wins"]
+}
 
-    if "hi" in t:
-        return random.choice(INTENTS["hi"])
+# ================= NLP TRAIN =================
+sentences = []
+tags = []
 
-    if "name" in t:
-        return random.choice(INTENTS["name"])
+for tag, patterns in DATA.items():
+    for p in patterns:
+        sentences.append(p)
+        tags.append(tag)
 
-    if "stress" in t or "sad" in t:
-        return random.choice(INTENTS["stress"])
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit_transform(sentences)
 
-    if "time" in t:
-        return datetime.datetime.now().strftime("%H:%M:%S")
+# ================= AI =================
+def predict(text):
+    vec = vectorizer.transform([text])
+    sim = cosine_similarity(vec, X)
+    idx = sim.argmax()
+    tag = tags[idx]
+    confidence = sim[0][idx]
 
-    if any(x in t for x in ["+","-","*","/"]):
-        try:
-            expr = re.sub("[^0-9\+\-\*\/\.]","",t)
-            if expr == "":
-                return "Math error"
-            return str(eval(expr))
-        except:
-            return "Math error"
+    if confidence < 0.25:
+        return random.choice(["Tell me more...","I’m listening...","Explain more..."])
 
-    return "Not found"
+    return random.choice(RESPONSES[tag])
 
 # ================= MEMORY =================
 if "chat" not in st.session_state:
     st.session_state.chat=[]
 
-# ================= ALERT =================
-st.markdown("<div class='alert'>⚠ SYSTEM ALERT: Online</div>", unsafe_allow_html=True)
-
-# ================= INPUT =================
-msg = st.text_input("Interface with AION...")
+msg = st.text_input("Talk to AION...")
 
 if st.button("SEND"):
     if msg:
-        r = respond(msg)
+        reply = predict(msg.lower())
         st.session_state.chat.append(("user",msg))
-        st.session_state.chat.append(("bot",r))
+        st.session_state.chat.append(("bot",reply))
 
-# ================= CHAT DISPLAY =================
 for role, m in st.session_state.chat:
     if role=="user":
         st.markdown(f"<div class='user'>YOU: {m}</div>", unsafe_allow_html=True)
