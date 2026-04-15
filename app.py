@@ -1,5 +1,5 @@
 import streamlit as st
-import random, re, datetime
+import random, datetime
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -31,7 +31,7 @@ body {
 """, unsafe_allow_html=True)
 
 now = datetime.datetime.now()
-st.markdown(f"<div class='header'><div>AION</div><div>{now.strftime('%H:%M:%S')}</div></div>", unsafe_allow_html=True)
+st.markdown(f"<div class='header'><div>ADA</div><div>{now.strftime('%H:%M:%S')}</div></div>", unsafe_allow_html=True)
 st.markdown("<div class='orb'></div>", unsafe_allow_html=True)
 
 # ================= DATA GENERATOR =================
@@ -45,7 +45,7 @@ def expand(base):
                 data.append(f"{p} {b} {s}".strip())
     return data
 
-# 8 emotions (each ~100 patterns)
+# ================= EMOTION DATA =================
 DATA = {
 "happy": expand(["happy","good","great","amazing","awesome","joyful","excited","positive"]),
 "sad": expand(["sad","down","depressed","empty","broken","hurt","lost","hopeless"]),
@@ -57,6 +57,24 @@ DATA = {
 "motivation": expand(["lazy","no motivation","no energy","cant focus","need motivation"])
 }
 
+# ================= GENERAL INTENTS =================
+DATA["greeting"] = [
+"hi","hello","hey","hii","yo","sup","good morning","good evening"
+]
+
+DATA["name"] = [
+"what is your name","who are you","your name","tell me your name"
+]
+
+DATA["creator"] = [
+"who created you","who made you","your creator","who built you"
+]
+
+DATA["help"] = [
+"what can you do","help me","features","what do you know"
+]
+
+# ================= RESPONSES =================
 RESPONSES = {
 "happy":["Nice 😄 keep going!","Love that energy 🔥"],
 "sad":["I’m here 💙 tell me more","You’re not alone"],
@@ -65,7 +83,12 @@ RESPONSES = {
 "angry":["Calm down first","What happened?"],
 "lonely":["I’m here with you","Talk to me"],
 "fear":["You’ll be okay","Face it slowly"],
-"motivation":["Start now 🔥","Discipline wins"]
+"motivation":["Start now 🔥","Discipline wins"],
+
+"greeting":["Hey 👋","Hello!","Hi there!"],
+"name":["I am ADA — your AI assistant."],
+"creator":["I was created by Srinivash 🔥"],
+"help":["I can chat, understand emotions, and support you."]
 }
 
 # ================= NLP TRAIN =================
@@ -89,7 +112,11 @@ def predict(text):
     confidence = sim[0][idx]
 
     if confidence < 0.25:
-        return random.choice(["Tell me more...","I’m listening...","Explain more..."])
+        return random.choice([
+            "Tell me more...",
+            "I’m listening...",
+            "Explain more..."
+        ])
 
     return random.choice(RESPONSES[tag])
 
@@ -97,7 +124,7 @@ def predict(text):
 if "chat" not in st.session_state:
     st.session_state.chat=[]
 
-msg = st.text_input("Talk to AION...")
+msg = st.text_input("Talk to ADA...")
 
 if st.button("SEND"):
     if msg:
@@ -105,8 +132,9 @@ if st.button("SEND"):
         st.session_state.chat.append(("user",msg))
         st.session_state.chat.append(("bot",reply))
 
+# ================= DISPLAY =================
 for role, m in st.session_state.chat:
     if role=="user":
         st.markdown(f"<div class='user'>YOU: {m}</div>", unsafe_allow_html=True)
     else:
-        st.markdown(f"<div class='bot'>AION: {m}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='bot'>ADA: {m}</div>", unsafe_allow_html=True)
