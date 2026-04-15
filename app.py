@@ -6,28 +6,28 @@ import pickle
 import os
 import datetime
 
-# =========================
-# CONFIG
-# =========================
-st.set_page_config(page_title="ADA SYSTEM", layout="wide")
+# ================= CONFIG =================
+st.set_page_config(layout="wide")
 
-# =========================
-# STYLE (JARVIS UI)
-# =========================
+# ================= UI =================
 st.markdown("""
 <style>
-body { background: radial-gradient(circle, #000814, #000); }
+body {
+    background-color:#020617;
+    background-image:
+        linear-gradient(rgba(0,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,255,0.05) 1px, transparent 1px);
+    background-size:40px 40px;
+}
 .title {
     text-align:center;
-    font-size:60px;
+    font-size:40px;
     color:#00f0ff;
-    text-shadow:0 0 30px #00f0ff;
 }
 .orb {
-    width:300px;height:300px;margin:auto;
-    border-radius:50%;
-    background:radial-gradient(circle,#00f0ff,#001f3f);
-    box-shadow:0 0 100px #00f0ff;
+    width:220px;height:220px;margin:auto;border-radius:50%;
+    background: radial-gradient(circle,#00f0ff,#001f3f);
+    box-shadow:0 0 80px #00f0ff;
     animation:pulse 2s infinite;
 }
 @keyframes pulse {
@@ -35,27 +35,23 @@ body { background: radial-gradient(circle, #000814, #000); }
 50%{transform:scale(1.1);}
 100%{transform:scale(1);}
 }
-.user {text-align:right;color:#00f0ff;font-size:18px;}
-.bot {text-align:left;color:white;font-size:18px;}
+.user {text-align:right;color:#00f0ff;}
+.bot {text-align:left;color:white;}
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<div class='title'>A D A — CORE</div>", unsafe_allow_html=True)
+st.markdown("<div class='title'>ADA SYSTEM</div>", unsafe_allow_html=True)
 st.markdown("<div class='orb'></div>", unsafe_allow_html=True)
 
-# =========================
-# INTENTS
-# =========================
+# ================= INTENTS =================
 INTENTS = [
     {"tag":"greeting","patterns":["hello","hi","hey"],"responses":["Hello!","Hi there!"]},
-    {"tag":"name","patterns":["name","who are you"],"responses":["I am ADA — your AI."]},
+    {"tag":"name","patterns":["name","who are you"],"responses":["I am ADA."]},
     {"tag":"time","patterns":["time"],"responses":["__TIME__"]},
-    {"tag":"math","patterns":["calculate","add","multiply"],"responses":["__MATH__"]}
+    {"tag":"math","patterns":["calculate","add"],"responses":["__MATH__"]}
 ]
 
-# =========================
-# TOKENIZER
-# =========================
+# ================= TOKENIZER =================
 class Tokenizer:
     def __init__(self):
         self.word2idx={}
@@ -80,9 +76,7 @@ class Tokenizer:
             vec[self.word2idx.get(w,0)]=1
         return vec
 
-# =========================
-# MODEL
-# =========================
+# ================= MODEL =================
 class Model:
     def __init__(self,inp,out):
         self.W=np.random.randn(inp,out)*0.1
@@ -91,47 +85,31 @@ class Model:
         e=np.exp(x-np.max(x))
         return e/np.sum(e)
 
-    def forward(self,x):
-        return self.softmax(x@self.W)
-
     def predict(self,x):
-        p=self.forward(x)
-        return np.argmax(p), np.max(p)
+        p=self.softmax(x@self.W)
+        return np.argmax(p),np.max(p)
 
-# =========================
-# TRAINING
-# =========================
-def train_model(tokenizer):
-    model=Model(tokenizer.vocab_size,len(INTENTS))
-    return model
-
-# =========================
-# LOAD / SAVE
-# =========================
+# ================= LOAD =================
 @st.cache_resource
-def load_system():
+def load():
     tok=Tokenizer()
-
     patterns=[p for i in INTENTS for p in i["patterns"]]
     tok.build(patterns)
 
-    if os.path.exists("ada_weights.pkl"):
-        model=pickle.load(open("ada_weights.pkl","rb"))
+    if os.path.exists("ada.pkl"):
+        model=pickle.load(open("ada.pkl","rb"))
     else:
-        model=train_model(tok)
-        pickle.dump(model,open("ada_weights.pkl","wb"))
+        model=Model(tok.vocab_size,len(INTENTS))
+        pickle.dump(model,open("ada.pkl","wb"))
 
     return tok,model
 
-tokenizer,model=load_system()
+tok,model=load()
 
-# =========================
-# RESPONSE ENGINE
-# =========================
+# ================= RESPONSE =================
 def respond(text):
-    vec=tokenizer.encode(text)
-    idx,conf=model.predict(vec)
-
+    vec=tok.encode(text)
+    idx,_=model.predict(vec)
     intent=INTENTS[idx]
     res=random.choice(intent["responses"])
 
@@ -147,21 +125,13 @@ def respond(text):
 
     return res
 
-# =========================
-# CHAT
-# =========================
+# ================= CHAT =================
 if "chat" not in st.session_state:
     st.session_state.chat=[]
 
-col1,col2=st.columns([5,1])
+user=st.text_input("Interface with ADA...")
 
-with col1:
-    user=st.text_input("Interface with ADA...")
-
-with col2:
-    send=st.button("SEND")
-
-if send:
+if st.button("SEND"):
     if user:
         r=respond(user)
         st.session_state.chat.append(("user",user))
