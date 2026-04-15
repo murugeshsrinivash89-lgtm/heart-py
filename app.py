@@ -35,20 +35,39 @@ now = datetime.datetime.now()
 st.markdown(f"<div class='header'><div>ADA</div><div>{now.strftime('%H:%M:%S')}</div></div>", unsafe_allow_html=True)
 st.markdown("<div class='orb'></div>", unsafe_allow_html=True)
 
-# ================= VOICE =================
+# ================= FIXED VOICE =================
 def speak(text):
     js = f"""
     <script>
-    var msg = new SpeechSynthesisUtterance("{text}");
-    var voices = speechSynthesis.getVoices();
-    var female = voices.find(v => v.name.toLowerCase().includes("female")) || voices[1];
-    msg.voice = female;
-    msg.rate = 1;
-    msg.pitch = 1;
-    speechSynthesis.speak(msg);
+    function speakNow() {{
+        window.speechSynthesis.cancel();
+
+        let msg = new SpeechSynthesisUtterance("{text}");
+
+        let voices = speechSynthesis.getVoices();
+
+        if (voices.length === 0) {{
+            setTimeout(speakNow, 200);
+            return;
+        }}
+
+        let female = voices.find(v =>
+            v.name.toLowerCase().includes("female") ||
+            v.name.toLowerCase().includes("zira") ||
+            v.name.toLowerCase().includes("google")
+        );
+
+        msg.voice = female || voices[0];
+        msg.rate = 1;
+        msg.pitch = 1;
+
+        speechSynthesis.speak(msg);
+    }}
+
+    speakNow();
     </script>
     """
-    components.html(js)
+    components.html(js, height=0)
 
 # ================= PATTERN GENERATOR =================
 def expand(base):
@@ -138,6 +157,9 @@ def predict(text):
 if "chat" not in st.session_state:
     st.session_state.chat=[]
 
+if "last" not in st.session_state:
+    st.session_state.last=""
+
 msg = st.text_input("Talk to ADA...")
 
 if st.button("SEND"):
@@ -145,7 +167,10 @@ if st.button("SEND"):
         reply = predict(msg)
         st.session_state.chat.append(("user",msg))
         st.session_state.chat.append(("bot",reply))
-        speak(reply)   # 🔥 VOICE OUTPUT
+
+        if reply != st.session_state.last:
+            speak(reply)
+            st.session_state.last = reply
 
 # ================= DISPLAY =================
 for role, m in st.session_state.chat:
