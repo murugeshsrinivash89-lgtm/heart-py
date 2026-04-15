@@ -1,17 +1,17 @@
 import streamlit as st
-import numpy as np
-import re
-import random
-import pickle
-import os
+import requests
 import datetime
+import time
 
-# ================= CONFIG =================
+API = "http://localhost:8000/chat"
+
 st.set_page_config(layout="wide")
 
-# ================= UI =================
+# ================== CSS ==================
 st.markdown("""
 <style>
+
+/* BACKGROUND GRID */
 body {
     background-color:#020617;
     background-image:
@@ -19,146 +19,128 @@ body {
         linear-gradient(90deg, rgba(0,255,255,0.05) 1px, transparent 1px);
     background-size:40px 40px;
 }
-.title {
-    text-align:center;
-    font-size:42px;
+
+/* HEADER */
+.header {
+    display:flex;
+    justify-content:space-between;
     color:#00f0ff;
-    margin-top:10px;
+    padding:10px;
+    font-size:18px;
 }
+
+/* STATUS BADGE */
+.status {
+    border:1px solid #00f0ff;
+    padding:5px 15px;
+    border-radius:20px;
+    box-shadow:0 0 10px #00f0ff;
+}
+
+/* ORB */
 .orb {
-    width:220px;height:220px;margin:20px auto;border-radius:50%;
+    width:250px;
+    height:250px;
+    margin:auto;
+    border-radius:50%;
     background: radial-gradient(circle,#00f0ff,#001f3f);
-    box-shadow:0 0 80px #00f0ff;
+    box-shadow:0 0 120px #00f0ff;
     animation:pulse 2s infinite;
 }
+
 @keyframes pulse {
 0%{transform:scale(1);}
-50%{transform:scale(1.1);}
+50%{transform:scale(1.12);}
 100%{transform:scale(1);}
 }
-.user {text-align:right;color:#00f0ff;font-size:18px;margin:8px;}
-.bot {text-align:left;color:white;font-size:18px;margin:8px;}
+
+/* CHAT */
+.user {
+    text-align:right;
+    color:#00f0ff;
+    margin:10px;
+    font-size:18px;
+}
+
+.bot {
+    text-align:left;
+    color:white;
+    margin:10px;
+    font-size:18px;
+}
+
+/* INPUT */
+.stTextInput input {
+    background:#020617;
+    color:#00f0ff;
+    border:1px solid #00f0ff;
+}
+
+.stButton button {
+    background:#00f0ff;
+    color:black;
+    font-weight:bold;
+    box-shadow:0 0 10px #00f0ff;
+}
+
+/* ALERT BOX */
+.alert {
+    border:1px solid red;
+    padding:10px;
+    color:#ff4d4d;
+    margin:10px;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<div class='title'>ADA SYSTEM</div>", unsafe_allow_html=True)
+# ================= HEADER =================
+now = datetime.datetime.now()
+
+st.markdown(f"""
+<div class="header">
+<div>ADA SYSTEM</div>
+<div class="status">{now.strftime('%H:%M:%S')} • STANDBY</div>
+</div>
+""", unsafe_allow_html=True)
+
+# ================= ORB =================
 st.markdown("<div class='orb'></div>", unsafe_allow_html=True)
 
-# ================= INTENTS =================
-INTENTS = [
-    {
-        "tag": "greeting",
-        "patterns": ["hello","hi","hey","hii","hiii","helo","hey bro","yo","sup"],
-        "responses": ["Hello Nivash 👋","Hi there!","Hey! What can I do?"]
-    },
-    {
-        "tag": "name",
-        "patterns": ["what is your name","who are you","your name"],
-        "responses": ["I am ADA — your AI assistant."]
-    },
-    {
-        "tag": "time",
-        "patterns": ["time","current time","tell time"],
-        "responses": ["__TIME__"]
-    },
-    {
-        "tag": "math",
-        "patterns": ["calculate","add","subtract","multiply","divide","+"],
-        "responses": ["__MATH__"]
-    }
-]
-
-# ================= TOKENIZER =================
-class Tokenizer:
-    def __init__(self):
-        self.word2idx = {}
-        self.vocab_size = 0
-
-    def tokenize(self, text):
-        return re.sub(r"[^a-z0-9 ]","",text.lower()).split()
-
-    def build(self, data):
-        self.word2idx = {"[UNK]":0}
-        idx = 1
-        for s in data:
-            for w in self.tokenize(s):
-                if w not in self.word2idx:
-                    self.word2idx[w] = idx
-                    idx += 1
-        self.vocab_size = len(self.word2idx)
-
-    def encode(self, text):
-        vec = np.zeros(self.vocab_size)
-        for w in self.tokenize(text):
-            vec[self.word2idx.get(w,0)] = 1
-        return vec
-
-# ================= MODEL =================
-class Model:
-    def __init__(self, inp, out):
-        self.W = np.random.randn(inp, out) * 0.1
-
-    def softmax(self, x):
-        e = np.exp(x - np.max(x))
-        return e / np.sum(e)
-
-    def predict(self, x):
-        p = self.softmax(x @ self.W)
-        return np.argmax(p), np.max(p)
-
-# ================= LOAD =================
-@st.cache_resource
-def load():
-    tok = Tokenizer()
-    patterns = [p for i in INTENTS for p in i["patterns"]]
-    tok.build(patterns)
-
-    if os.path.exists("ada.pkl"):
-        model = pickle.load(open("ada.pkl","rb"))
-    else:
-        model = Model(tok.vocab_size, len(INTENTS))
-        pickle.dump(model, open("ada.pkl","wb"))
-
-    return tok, model
-
-tok, model = load()
-
-# ================= RESPONSE =================
-def respond(text):
-    vec = tok.encode(text)
-    idx, conf = model.predict(vec)
-
-    # fallback
-    if conf < 0.55:
-        return "I'm not sure I understand."
-
-    intent = INTENTS[idx]
-    res = random.choice(intent["responses"])
-
-    if res == "__TIME__":
-        return datetime.datetime.now().strftime("%H:%M:%S")
-
-    if res == "__MATH__" and any(x in text for x in ["+","-","*","/"]):
-        try:
-            expr = re.sub(r"[^0-9+\-*/().]", "", text)
-            return str(eval(expr))
-        except:
-            return "Math error"
-
-    return res
-
-# ================= CHAT =================
+# ================= SESSION =================
 if "chat" not in st.session_state:
     st.session_state.chat = []
 
+# ================= INPUT =================
 user = st.text_input("Interface with ADA...")
 
 if st.button("SEND"):
     if user:
-        reply = respond(user)
+        status = st.empty()
+        status.markdown("<div class='status'>PROCESSING...</div>", unsafe_allow_html=True)
+
+        try:
+            res = requests.post(API, json={"message": user})
+            data = res.json()
+
+            reply = data["reply"]
+
+            # OPEN URL
+            if data.get("open_url"):
+                st.markdown(f"[OPEN LINK]({data['open_url']})")
+
+        except:
+            reply = "⚠️ SYSTEM ERROR: Backend not connected"
+            st.markdown("<div class='alert'>Backend Offline</div>", unsafe_allow_html=True)
+
+        time.sleep(0.4)
+
         st.session_state.chat.append(("user", user))
         st.session_state.chat.append(("bot", reply))
 
+        status.markdown("<div class='status'>STANDBY</div>", unsafe_allow_html=True)
+
+# ================= CHAT DISPLAY =================
 for role, msg in st.session_state.chat:
     if role == "user":
         st.markdown(f"<div class='user'>YOU: {msg}</div>", unsafe_allow_html=True)
